@@ -1,11 +1,15 @@
+#include "opencv/highgui.h"
 #include "../../src/FrameHelper.h"
 
 #include <rtt/typelib/TypelibMarshallerBase.hpp>
 #include <rice/Constructor.hpp>
 #include <rice/Object.hpp>
+#include <rice/Array.hpp>
 
 #include <typelib/value.hh>
 #include <typelib_ruby.hh>
+
+#include <iostream>
 
 using namespace Rice;
 using namespace frame_helper;
@@ -33,6 +37,18 @@ template<> Frame* from_ruby<Frame*>(Object object)
     return (Frame*)cxx_data;
 }
 
+template<>
+std::vector<uint8_t> from_ruby<std::vector<uint8_t> >(Object obj)
+{
+    Rice::Array a(obj);
+    std::vector<uint8_t> result;
+    result.reserve(a.size());
+    for (Rice::Array::iterator it = a.begin(); it != a.end(); ++it) {
+        result.push_back(from_ruby<uint8_t>(*it));
+    }
+    return result;
+}
+
 FrameHelper sframe_helper;
 void saveFrame(std::string filename,Frame& frame)
 {
@@ -43,6 +59,14 @@ void loadFrame(std::string filename,Frame& frame)
     sframe_helper.loadFrame(filename,frame);
 }
 
+void loadJpegFromData(Object obj, Frame& frame)
+{
+    cv::Mat mat;
+    cv::imdecode(from_ruby<std::vector<uint8_t> >(obj), cv::IMREAD_COLOR, &mat);
+    FrameHelper::copyMatToFrame(mat, frame);
+}
+
+
 
 extern "C"
 void Init_frame_helper_ruby()
@@ -52,6 +76,7 @@ void Init_frame_helper_ruby()
     .define_constructor(Constructor<FrameHelper>())
     .define_singleton_method("save_frame", &saveFrame,(Arg("filename"),Arg("image")))
     .define_singleton_method("load_frame", &loadFrame,(Arg("filename"),Arg("image")))
+    .define_singleton_method("load_jpeg_from_data", &loadJpegFromData, (Arg("bytes"),Arg("image")))
     .define_method("save_frame", &frame_helper::FrameHelper::saveFrame,(Arg("filename"),Arg("image")))
     .define_method("load_frame", &frame_helper::FrameHelper::loadFrame,(Arg("filename"),Arg("image")));
 }
